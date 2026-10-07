@@ -43,7 +43,7 @@ Repositori ini mengimplementasikan pipeline rekayasa data (*data engineering*) b
 - **Storage Lakehouse Parquet**: Konversi otomatis CSV ke Parquet terkompresi ZSTD dengan penghematan ruang sebesar 89,1%.
 - **Dual Analytical Engine**: Dukungan eksekusi fleksibel melalui mesin Pandas C-engine maupun mesin kolumnar DuckDB berkecepatan tinggi.
 - **dbt Data Transformation Layer**: Model *staging* (`stg_dns_packets`) dan 3 model *marts* (`fct_temporal_metrics`, `fct_pareto_prefix`, `fct_protocol_matrix`) yang tereksekusi penuh dalam 4,13 detik.
-- **Automated Data Quality Testing**: 12 *data tests* dbt (uji keunikan, *not-null*, dan *accepted values*) yang lulus dalam 0,50 detik, ditambah kontrak skema protokol via Pandera.
+- **Automated Data Quality Testing**: 16 *data tests* dbt (12 uji skema generik dan 4 uji singular rekonsiliasi analitik) yang lulus 100%, ditambah kontrak skema protokol via Pandera.
 - **Deterministic Spike Decomposition**: Membedah lonjakan galat NXDOMAIN menit puncak terhadap *steady-state baseline* secara matematis.
 - **JSON Telemetry Export**: Serialisasi data metrik terkomputasi ke berkas JSON terstruktur untuk konsumsi hilir (*downstream consumption*).
 
@@ -212,7 +212,8 @@ Untuk melindungi kode sebelum terkirim ke remote:
 
 ```
 .
-├── .gi│   └── workflows/
+├── .github/
+│   └── workflows/
 │       └── ci.yml              # Pipeline CI GitHub Actions (Lint, Security, Pytest Matrix, dbt)
 ├── .githooks/                  # Git hooks perlindungan data lokal
 │   ├── pre-commit              # Validasi file staged sebelum commit
@@ -347,22 +348,7 @@ Untuk menjamin kualitas analitik dan mencegah kebocoran data tak sengaja, branch
      - `dbt Models & Data Quality Contracts` (`dbt-pipeline`)
 
 3. **Do not allow bypassing the above settings**:
-   - Aktifkan opsi `Do not allow bypassing the above settings` (termasuk untuk Administrator repositori) guna menjamin tidak ada merger darurat yang mengabaikan pemindaian data sensitif dan pengujian analitik.-sample 200000
-
-# 5. Jalankan kalkulasi analitik penuh dan ekspor ringkasan metrik
-python -m src
-```
-
-### 3. Pengujian Otomatis dan CI Lokal
-
-```bash
-# Uji pemformatan dan linting kode
-ruff check .
-ruff format --check .
-
-# Eksekusi 13 unit test (Pandera, DuckDB, Metrics, Anomaly, CLI)
-pytest tests/ -v
-```
+   - Aktifkan opsi `Do not allow bypassing the above settings` (termasuk untuk Administrator repositori) guna menjamin tidak ada merger darurat yang mengabaikan pemindaian data sensitif dan pengujian analitik.
 
 ---
 
@@ -416,7 +402,7 @@ Setiap angka di bawah ini bersumber langsung dari hasil komputasi kode:
 | Puncak NXDOMAIN | 51.629 / menit | Nilai maksimum agregat per menit (menit 08:02 UTC) |
 | Kontribusi Top-2 Host Spike | 50,2% | `nx_delta` selisih bersih host H1 dan H2 pada menit 08:02 UTC |
 | Kecepatan Eksekusi dbt Run | 4,13 detik | Eksekusi 4 model dbt via adapter DuckDB |
-| Kecepatan Eksekusi dbt Test | 0,50 detik | Validasi 12 schema tests dbt |
+| Kecepatan Eksekusi dbt Test | 0,62 detik | Validasi 16 data tests dbt (12 skema + 4 singular) |
 
 ---
 
