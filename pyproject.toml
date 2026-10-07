@@ -31,4 +31,8 @@ ignore = ["E501", "E402"]
 venvPath = "."
 venv = ".venv"
 extraPaths = ["."]
+exclude = [
+    ".venv",
+    "notebooks",
+]
 

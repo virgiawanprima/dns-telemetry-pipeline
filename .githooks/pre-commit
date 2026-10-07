@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Git Pre-Commit Hook - DNS Telemetry Pipeline
+# Prevents accidental staging and committing of confidential datasets,
+# database files, execution outputs, and credentials.
+#
+# Activation instruction:
+#   git config core.hooksPath .githooks
+set -e
+
+# Select Python binary (venv or system python3)
+if [ -f ".venv/bin/python" ]; then
+    PYTHON=".venv/bin/python"
+elif command -v python3 >/dev/null 2>&1; then
+    PYTHON="python3"
+elif command -v python >/dev/null 2>&1; then
+    PYTHON="python"
+else
+    echo "ERROR: Python interpreter not found." >&2
+    exit 1
+fi
+
+echo "Running pre-commit data protection and confidentiality checks..."
+$PYTHON scripts/data_protection_check.py --stage pre-commit

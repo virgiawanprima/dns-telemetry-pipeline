@@ -1,6 +1,4 @@
-# ==============================================================================
 # Git Ignore Configuration - DNS Telemetry Pipeline (Data Confidentiality Protected)
-# ==============================================================================
 
 # 1. Confidential & Restricted Data (Keep ALL real data local)
 data/*

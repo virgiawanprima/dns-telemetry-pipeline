@@ -13,8 +13,10 @@
 - [Benchmark Performa](#benchmark-performa)
 - [Pemodelan Data dan dbt](#pemodelan-data-dan-dbt)
 - [Kontrak Kualitas Data](#kontrak-kualitas-data)
+- [Perlindungan Data dan Keamanan](#perlindungan-data-dan-keamanan)
 - [Struktur Repositori](#struktur-repositori)
 - [Mulai Cepat](#mulai-cepat)
+- [Aturan Merge dan Perlindungan Branch](#aturan-merge-dan-perlindungan-branch)
 - [Modul dan Komponen](#modul-dan-komponen)
 - [Temuan Operasional](#temuan-operasional)
 - [Angka Kunci dan Sumber](#angka-kunci-dan-sumber)
@@ -115,28 +117,60 @@ Transformasi data dimodelkan secara modular di dalam direktori `dbt_dns/`:
 
 ### Hasil Eksekusi dbt
 - **Transformasi (`dbt run`)**: 4 model selesai dalam **4,13 detik**.
-- **Pengujian Kualitas Data (`dbt test`)**: 12 pengujian (*not null*, *unique*, *accepted values*) lulus 100% dalam **0,50 detik**.
+- **Pengujian Kualitas Data (`dbt test`)**: 16 pengujian data (12 uji skema generik *not-null*, *unique*, *accepted values* serta 4 uji singular rekonsiliasi analitik) lulus 100% dalam **0,62 detik**.
 
 ---
 
 ## Kontrak Kualitas Data
 
-Melalui modul `src/validation.py`, penegakan kontrak skema Pandera memeriksa sampel rekaman data sebelum kalkulasi analitik dilakukan:
-- Nilai flag `qr` wajib bernilai 0 (Query) atau 1 (Response).
-- Nilai protokol `proto` wajib berada di dalam himpunan `['udp', 'tcp']`.
-- Nilai `rcode` wajib berada pada rentang kode yang valid (0 sampai 23).
-- Nilai panjang frame jaringan `frame_len` dan panjang payload `dns_len` wajib lebih besar dari 0.
-- Nilai `qdcount` wajib berada pada rentang wajar (0 sampai 20).
+Melalui modul `src/validation.py`, penegakan kontrak skema berbasis Pandera memeriksa data sebelum kalkulasi analitik dijalankan. Proyek ini membedakan secara tegas antara batasan protokol jaringan standar (RFC) dan kebijakan operasional kualitas data:
+
+1. **Batasan Protokol RFC**:
+   - Nilai flag pesan `qr` wajib bernilai 0 (Query) atau 1 (Response) sesuai RFC 1035.
+   - Protokol transport `proto` wajib berada di dalam himpunan protokol DNS valid (`['udp', 'tcp']`).
+   - Kode respons `rcode` berada pada rentang yang dialokasikan IANA (0 sampai 23).
+   - Panjang frame `frame_len` dan panjang payload DNS `dns_len` wajib bernilai positif (> 0).
+
+2. **Kebijakan Kualitas Data Proyek**:
+   - Nilai `qdcount` dibatasi pada rentang operasional wajar (0 sampai 20) untuk menyaring anomali paket malformed yang menyimpang dari pola query normal.
+   - Pengecekan konsistensi waktu memastikan timestamp berada dalam rentang observasi yang valid.
 
 ---
+
+## Perlindungan Data dan Keamanan
+
+Repositori ini menerapkan kebijakan ketat perlindungan kerahasiaan data (*zero-data leakage policy*):
+
+### Kebijakan Data Terbatas
+1. **Pencegahan Commit Data Asli**: Seluruh berkas dataset DNS mentah (`data/*.csv`, `data/*.parquet`), tangkapan paket (`*.pcap`, `*.pcapng`), basis data DuckDB lokal (`data/*.duckdb`), kredensial (`.env*`, `*.pem`, `*.key`), dan keluaran analitik (`output/*.json`) dicegah masuk ke Git melalui `.gitignore`.
+2. **Kemandirian Pengujian Sintetis**: Seluruh pengujian CI, pytest, dan dbt build dijalankan secara terisolasi menggunakan data sintetis deterministik yang digenerate oleh `scripts/generate_sample_data.py`.
+3. **Pembersihan Keluaran Notebook**: Berkas Jupyter notebook diperiksa untuk memastikan tidak memuat riwayat eksekusi cell yang berpotensi membocorkan data sensitif.
+
+### Git Hooks (Pre-Commit & Pre-Push)
+Untuk melindungi kode sebelum terkirim ke remote:
+- **`pre-commit`**: Memeriksa berkas yang berada dalam area *staged* sebelum perintah `git commit` diselesaikan.
+- **`pre-push`**: Mengaudit seluruh rentang commit (*commit range*) yang akan dikirim ke remote (`remote_ref..local_ref`), bukan hanya *working tree* terakhir. Hal ini mencegah pengiriman commit lama yang membawa berkas terlarang.
+
+> [!IMPORTANT]
+> Git hooks tidak otomatis aktif setelah proses `git clone`. Pengembang wajib mengaktifkan konfigurasi hooks lokal dengan menjalankan:
+> ```bash
+> git config core.hooksPath .githooks
+> ```
+
+### Batasan Deteksi & Pencegahan Dini
+- **Batas Deteksi Scanner**: Pemindai rahasia lokal (`scripts/data_protection_check.py` dan `detect-secrets`) mendeteksi token berentropi tinggi dan pola kredensial terstruktur. Scanner **tidak dapat secara otomatis mengenali seluruh variasi alamat IP, prefiks jaringan, domain privat, atau data pribadi (PII)** tanpa pola format spesifik. Oleh karena itu, disiplin pengembang dan pembatasan via `.gitignore` merupakan garis pertahanan utama.
+- **Pencegahan Sebelum Push**: Jangan pernah mengandalkan event `push` pada CI GitHub Actions sebagai mekanisme proteksi utama, karena data sensitif yang terdorong telah sampai di server remote sebelum workflow CI dijalankan. Perlindungan wajib dilakukan secara lokal pada level pre-commit dan pre-push.
+- **Keamanan Log**: Pemindai tidak menampilkan nilai rahasia di konsol atau log; pemindai hanya menampilkan kategori temuan, nama berkas, dan nomor baris.
 
 ## Struktur Repositori
 
 ```
 .
-├── .github/
-│   └── workflows/
-│       └── ci.yml              # Pipeline CI GitHub Actions (Lint, Test Matrix, dbt)
+├── .gi│   └── workflows/
+│       └── ci.yml              # Pipeline CI GitHub Actions (Lint, Security, Pytest Matrix, dbt)
+├── .githooks/                  # Git hooks perlindungan data lokal
+│   ├── pre-commit              # Validasi file staged sebelum commit
+│   └── pre-push                # Audit commit range sebelum transmisi push
 ├── main.py                     # Entrypoint wrapper ringan yang meneruskan ke src.cli
 ├── pyproject.toml              # Konfigurasi build metadata, pytest, dan ruff
 ├── requirements.txt            # Dependensi produksi Python terverifikasi
@@ -147,16 +181,19 @@ Melalui modul `src/validation.py`, penegakan kontrak skema Pandera memeriksa sam
 │   ├── test_metrics.py         # Uji agregasi temporal, Pareto, kontingensi QTYPE
 │   ├── test_anomaly.py         # Uji dekomposisi burst NXDOMAIN menit puncak
 │   ├── test_duck_engine.py     # Uji konversi Parquet dan agregasi DuckDB
-│   └── test_cli.py             # Uji integrasi eksekusi end-to-end CLI
+│   ├── test_cli.py             # Uji integrasi eksekusi end-to-end CLI
+│   └── test_analytics_truth.py # Uji kebenaran analitik matematis & rekonsiliasi
 ├── scripts/
 │   ├── benchmark.py            # Skrip benchmark perbandingan Pandas vs DuckDB
-│   └── generate_sample_data.py # Generator dataset sintetis untuk lingkungan CI
+│   ├── generate_sample_data.py # Generator dataset sintetis untuk lingkungan CI
+│   └── data_protection_check.py # Scanner perlindungan kerahasiaan data dan rahasia
 ├── dbt_dns/                    # Proyek dbt Core (adapter DuckDB)
 │   ├── dbt_project.yml         # Konfigurasi proyek dbt
-│   ├── profiles.yml            # Konfigurasi koneksi database DuckDB lokal
-│   └── models/
-│       ├── staging/            # Lapisan staging (stg_dns_packets.sql)
-│       └── marts/              # Lapisan analitik (fct_*.sql)
+│   ├── profiles.yml            # Konfigurasi koneksi database DuckDB lokal terisolasi
+│   ├── models/
+│   │   ├── staging/            # Lapisan staging (stg_dns_packets.sql)
+│   │   └── marts/              # Lapisan analitik (fct_*.sql)
+│   └── tests/                  # Uji singular dbt (rekonsiliasi & proteksi nol-baris)
 ├── src/                        # Paket pipeline modular (arsitektur src-layout)
 │   ├── __init__.py             # Inisialisasi package
 │   ├── __main__.py             # Entrypoint eksekusi via python -m src
@@ -172,7 +209,7 @@ Melalui modul `src/validation.py`, penegakan kontrak skema Pandera memeriksa sam
 │   └── metrics_summary.json    # Ringkasan analitik dan agregasi terkomputasi
 ├── notebooks/                  # Analisis interaktif
 │   └── dns_telemetry_analysis.ipynb # Notebook analisis mendalam dan eksplorasi data
-└── data/                       # Direktori dataset sumber
+└── data/                       # Direktori dataset sumber (terisolasi lokal)
     ├── sample-dns-30min.csv    # Dataset mentah telemetri DNS (2,28 GB)
     ├── sample-dns-30min.parquet # Dataset kolumnar terkompresi ZSTD (250 MB)
     └── dns_analytics.duckdb    # Database analitik lokal DuckDB hasil dbt
@@ -187,12 +224,15 @@ Melalui modul `src/validation.py`, penegakan kontrak skema Pandera memeriksa sam
 - RAM minimal 4 GB saat menggunakan Parquet/DuckDB (atau minimal 16 GB untuk pemrosesan Pandas CSV penuh).
 - Ruang disk kosong minimal 3 GB.
 
-### 1. Pemasangan Lingkungan
+### 1. Pemasangan Lingkungan & Aktivasi Git Hooks
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+
+# Wajib: Aktifkan git hooks lokal untuk perlindungan data
+git config core.hooksPath .githooks
 ```
 
 ### 2. Opsi Eksekusi Pipeline CLI
@@ -206,11 +246,62 @@ python -m src --to-parquet
 # 2. Jalankan pengujian kontrak data quality Pandera
 python -m src --validate --sample 100000
 
-# 3. Jalankan transformasi dbt dan pengujian schema tests otomatis
+# 3. Jalankan transformasi dbt dan pengujian assertions otomatis
 python -m src --run-dbt
 
 # 4. Jalankan pengujian benchmark komparasi performa
 python -m src --benchmark --sample 200000
+
+# 5. Jalankan kalkulasi analitik penuh dan ekspor ringkasan metrik
+python -m src
+```
+
+### 3. Pengujian Otomatis dan CI Lokal
+
+```bash
+# 1. Uji pemformatan dan linting kode
+ruff check .
+ruff format --check .
+
+# 2. Audit kepatuhan kerahasiaan data dan pemindaian kredensial
+python scripts/data_protection_check.py --stage audit
+
+# 3. Eksekusi 22 unit test (kebenaran analitik, Pandera, DuckDB, Metrics, Anomaly, CLI)
+pytest tests/ -v
+
+# 4. Eksekusi build dbt lokal (model + 16 uji kualitas data)
+dbt build --project-dir dbt_dns --profiles-dir dbt_dns
+```
+
+---
+
+## Aturan Merge dan Perlindungan Branch
+
+> [!WARNING]
+> Konfigurasi alur kerja di `.github/workflows/ci.yml` mendefinisikan pekerjaan otomatisasi CI. Berkas workflow **tidak secara otomatis mengunci branch** di repositori GitHub. Administrator repositori wajib mengaktifkan kebijakan perlindungan branch (*Branch Protection Rules*) secara manual melalui GitHub Repository Settings.
+
+### Pengaturan GitHub yang Wajib Diterapkan
+
+Untuk menjamin kualitas analitik dan mencegah kebocoran data tak sengaja, branch `main` harus dikonfigurasi melalui menu **Settings > Branches > Branch protection rules**:
+
+1. **Require a pull request before merging**:
+   - Aktifkan opsi `Require approvals` (minimal 1 peninjau kode independen).
+   - Aktifkan `Dismiss stale pull request approvals when new commits are pushed`.
+   - Cegah penggabungan langsung (*direct push*) ke branch `main`.
+
+2. **Require status checks to pass before merging**:
+   - Aktifkan `Require branches to be up to date before merging`.
+   - Pilih dan wajibkan seluruh pemeriksaan berikut berstatus sukses:
+     - `CI Gatekeeper` (`ci-gate`)
+     - `Code Quality & Linting` (`lint-and-format`)
+     - `Security & Data Protection Policies` (`security-and-data-protection`)
+     - `Unit Tests & Analytical Truth (Python 3.10)`
+     - `Unit Tests & Analytical Truth (Python 3.11)`
+     - `Unit Tests & Analytical Truth (Python 3.12)`
+     - `dbt Models & Data Quality Contracts` (`dbt-pipeline`)
+
+3. **Do not allow bypassing the above settings**:
+   - Aktifkan opsi `Do not allow bypassing the above settings` (termasuk untuk Administrator repositori) guna menjamin tidak ada merger darurat yang mengabaikan pemindaian data sensitif dan pengujian analitik.-sample 200000
 
 # 5. Jalankan kalkulasi analitik penuh dan ekspor ringkasan metrik
 python -m src
