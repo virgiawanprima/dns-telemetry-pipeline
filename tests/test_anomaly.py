@@ -18,6 +18,7 @@ def test_nx_delta_reconciliation():
     # Create two minutes of data
     m1 = pd.Timestamp("2026-08-19 08:00:00", tz="UTC")
     m2 = pd.Timestamp("2026-08-19 08:01:00", tz="UTC")
+    assert isinstance(m2, pd.Timestamp)
     minute_idx = pd.DatetimeIndex([m1, m2])
 
     data = [
