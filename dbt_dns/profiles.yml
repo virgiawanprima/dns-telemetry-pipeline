@@ -3,5 +3,5 @@ dns_telemetry:
   outputs:
     dev:
       type: duckdb
-      path: 'data/dns_analytics.duckdb'
+      path: "{{ env_var('DBT_DUCKDB_PATH', 'data/dns_analytics.duckdb') }}"
       threads: 4

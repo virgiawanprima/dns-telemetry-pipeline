@@ -29,5 +29,5 @@ select
     round(m.response_count * 100.0 / t.total_qtype_responses, 2) as row_percentage
 from matrix m
 join totals_per_qtype t on m.qtype_name = t.qtype_name
-where t.total_qtype_responses >= 1000
+where t.total_qtype_responses >= 10
 order by t.total_qtype_responses desc, m.response_count desc

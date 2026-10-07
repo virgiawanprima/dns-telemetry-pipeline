@@ -2,7 +2,7 @@
 
 with source_data as (
     select *
-    from read_parquet('data/sample-dns-30min.parquet')
+    from read_parquet('{{ env_var("DBT_SOURCE_PARQUET", "data/sample-dns-30min.parquet") }}')
 )
 
 select

@@ -13,13 +13,15 @@ models:
         tests:
           - not_null
           - accepted_values:
-              values: [0, 1]
+              arguments:
+                values: [0, 1]
       - name: protocol
         description: "Transport protocol"
         tests:
           - not_null
           - accepted_values:
-              values: ['udp', 'tcp']
+              arguments:
+                values: ['udp', 'tcp']
       - name: response_code
         description: "DNS RCODE integer (0=NOERROR, 3=NXDOMAIN, etc.) for response packets"
         tests:
