@@ -2,6 +2,7 @@ import argparse
 import sys
 import time
 from pathlib import Path
+from typing import Any, cast
 
 import psutil
 
@@ -50,16 +51,14 @@ def main():
     parquet_path = args.parquet
     limit = args.sample
 
-    print("==================================================================")
-    print(f" DNS ENGINE BENCHMARK SUITE (Sample: {limit:,} records) ")
-    print("==================================================================")
+    print(f"DNS Engine Benchmark Suite (Sample: {limit:,} records)")
 
     # 1. Pandas C-Engine
     def run_pandas():
         df = pd.read_csv(
             csv_path,
             engine="c",
-            dtype=DNS_SCHEMA_DTYPES,
+            dtype=cast(Any, DNS_SCHEMA_DTYPES),
             nrows=limit,
             keep_default_na=False,
             na_values=[""],
@@ -109,9 +108,7 @@ def main():
 
     res_duck_parquet = benchmark_engine("DuckDB (Columnar Parquet)", run_duckdb_parquet)
 
-    print("\n==================================================================")
-    print(" BENCHMARK RESULTS SUMMARY ")
-    print("==================================================================")
+    print("\nBenchmark Results Summary:")
     results = [res_pandas, res_duck_csv, res_duck_parquet]
     baseline_time = res_pandas["time_s"]
 
@@ -122,7 +119,6 @@ def main():
         print(
             f"| {r['engine']} | {r['time_s']:.2f}s | {r['delta_ram_mb']:.1f} MB | **{speedup:.1f}x lebih cepat** |"
         )
-    print("==================================================================")
 
 
 if __name__ == "__main__":

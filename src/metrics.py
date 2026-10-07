@@ -3,7 +3,7 @@
 import ipaddress
 import logging
 from collections import Counter
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
@@ -34,34 +34,47 @@ def compute_temporal_aggregates(
     logger.info("Computing temporal aggregates...")
     # Add minute bucket
     df_temp = df.copy()
-    df_temp["minute"] = df_temp["dt"].dt.floor("1min")
+    df_temp["minute"] = cast(Any, df_temp["dt"].dt).floor("1min")
 
     # Group metrics by minute
     grouped = df_temp.groupby("minute")
-
-    packets = grouped.size().rename("packets")
-    queries = grouped.apply(lambda g: (g["qr"] == 0).sum(), include_groups=False).rename("queries")
-    responses = grouped.apply(lambda g: (g["qr"] == 1).sum(), include_groups=False).rename(
-        "responses"
+    packets = grouped.size()
+    queries = df_temp[df_temp["qr"] == 0].groupby("minute").size()
+    responses = df_temp[df_temp["qr"] == 1].groupby("minute").size()
+    nx = df_temp[df_temp["rcode"] == 3].groupby("minute").size()
+    udp_resp = df_temp[(df_temp["proto"] == "udp") & (df_temp["qr"] == 1)].groupby("minute").size()
+    udp_tc = (
+        df_temp[(df_temp["proto"] == "udp") & (df_temp["qr"] == 1) & (df_temp["tc"] == 1)]
+        .groupby("minute")
+        .size()
     )
-    nx = grouped.apply(lambda g: (g["rcode"] == 3).sum(), include_groups=False).rename("nx")
-    udp_resp = grouped.apply(
-        lambda g: ((g["proto"] == "udp") & (g["qr"] == 1)).sum(), include_groups=False
-    ).rename("udp_resp")
-    udp_tc = grouped.apply(
-        lambda g: ((g["proto"] == "udp") & (g["qr"] == 1) & (g["tc"] == 1)).sum(),
-        include_groups=False,
-    ).rename("udp_tc")
 
-    temporal = pd.concat([packets, queries, responses, nx, udp_resp, udp_tc], axis=1)
+    temporal = pd.concat(
+        {
+            "packets": packets,
+            "queries": queries,
+            "responses": responses,
+            "nx": nx,
+            "udp_resp": udp_resp,
+            "udp_tc": udp_tc,
+        },
+        axis=1,
+    ).fillna(0)
+
+    # Reindex to continuous 1-minute intervals to handle minutes without messages
+    if not temporal.empty:
+        start_min = temporal.index.min()
+        end_min = temporal.index.max()
+        tz = getattr(start_min, "tz", None)
+        full_index = pd.date_range(start=start_min, end=end_min, freq="1min", tz=tz)
+        temporal = temporal.reindex(full_index, fill_value=0)
+        temporal.index.name = "minute"
 
     # Derived rates
-    temporal["nx_rate"] = np.where(
-        temporal["responses"] > 0, (temporal["nx"] / temporal["responses"]) * 100.0, 0.0
-    )
-    temporal["tc_ratio"] = np.where(
-        temporal["udp_resp"] > 0, (temporal["udp_tc"] / temporal["udp_resp"]) * 100.0, 0.0
-    )
+    resp = temporal["responses"]
+    temporal["nx_rate"] = (temporal["nx"] / resp.replace(0, np.nan) * 100.0).fillna(0.0)
+    udp_r = temporal["udp_resp"]
+    temporal["tc_ratio"] = (temporal["udp_tc"] / udp_r.replace(0, np.nan) * 100.0).fillna(0.0)
 
     # In 30-min capture, boundary minutes (first & last) are usually partial
     all_minutes = temporal.index
@@ -89,10 +102,13 @@ def compute_temporal_aggregates(
             (temporal_steady["udp_tc"].sum() / max(temporal_steady["udp_resp"].sum(), 1)) * 100.0
         ),
         "median_other": float(
-            temporal_steady.loc[temporal_steady.index != peak_minute, "packets"].median()
+            cast(
+                Any,
+                temporal_steady.loc[temporal_steady.index != peak_minute, "packets"],
+            ).median()
         )
         if len(temporal_steady) > 1
-        else float(temporal_steady["packets"].median()),
+        else float(cast(Any, temporal_steady["packets"]).median()),
     }
 
     return temporal_steady, meta_temporal
@@ -134,7 +150,7 @@ def compute_protocol_matrix(
     resp_df = df[df["qr"] == 1].copy()
 
     # Normalize qtype labels
-    qtype_counts = resp_df["qtype_name"].value_counts()
+    qtype_counts = df.loc[df["qr"] == 1, "qtype_name"].value_counts()
     top_qtype_names = list(qtype_counts.head(top_qtypes).index)
 
     # Cross-tabulation normalized by row (percentage)
@@ -144,7 +160,7 @@ def compute_protocol_matrix(
     matrix_pct = crosstab_top.div(row_sums, axis=0) * 100.0
 
     # Human-readable column names
-    col_names = [RCODE_NAMES.get(int(c), str(c)) for c in matrix_pct.columns]
+    col_names = [RCODE_NAMES.get(int(cast(Any, c)), f"{c}") for c in matrix_pct.columns]
 
     # Global compositions
     q_mask = df["qr"] == 0
@@ -152,16 +168,18 @@ def compute_protocol_matrix(
     top_q_disp = list(qtype_all.head(5).items())
     other_q = qtype_all.iloc[5:].sum()
     qt_labels = [k for k, _ in top_q_disp] + ["Lainnya"]
-    qt_vals = [int(v) for _, v in top_q_disp] + [int(other_q)]
+    qt_vals = [v for _, v in top_q_disp] + [other_q]
 
-    rcode_all = resp_df["rcode"].value_counts()
-    top_rc_disp = [(RCODE_NAMES.get(int(k), str(k)), v) for k, v in rcode_all.head(4).items()]
+    rcode_all = df.loc[df["qr"] == 1, "rcode"].value_counts()
+    top_rc_disp = [
+        (RCODE_NAMES.get(int(cast(Any, k)), f"{k}"), v) for k, v in rcode_all.head(4).items()
+    ]
     other_rc = rcode_all.iloc[4:].sum()
     rc_labels = [k for k, _ in top_rc_disp] + ["Lainnya"]
-    rc_vals = [int(v) for _, v in top_rc_disp] + [int(other_rc)]
+    rc_vals = [v for _, v in top_rc_disp] + [other_rc]
 
     matrix_meta = {
-        "qtype_labels": [str(x) for x in matrix_pct.index],
+        "qtype_labels": [f"{x}" for x in matrix_pct.index],
         "rcode_labels": col_names,
         "values": [[float(v) for v in row] for row in matrix_pct.values],
         "composition_qtype": {"labels": qt_labels, "values": qt_vals},
@@ -175,22 +193,24 @@ def compute_truncation_by_qtype(df: pd.DataFrame, min_responses: int = 500) -> l
     """Compute UDP response truncation rate (TC bit) per QTYPE."""
     udp_resp = df[(df["proto"] == "udp") & (df["qr"] == 1)]
     grouped = udp_resp.groupby("qtype_name", observed=True)
+    counts = dict(grouped.size())
 
-    counts = grouped.size()
-    tc_counts = grouped["tc"].apply(lambda s: (s == 1).sum())
+    tc_resp = df[(df["proto"] == "udp") & (df["qr"] == 1) & (df["tc"] == 1)]
+    tc_grouped = tc_resp.groupby("qtype_name", observed=True)
+    tc_counts = dict(tc_grouped.size())
 
-    filtered_counts = counts[counts >= min_responses]
-    rates = (tc_counts[filtered_counts.index] / filtered_counts) * 100.0
-    rates_sorted = rates.sort_values(ascending=False)
+    results: list[dict[str, Any]] = []
+    for qtype, total in counts.items():
+        if total >= min_responses:
+            tc_count = tc_counts.get(qtype, 0)
+            rate = (tc_count / total) * 100.0
+            results.append(
+                {
+                    "tipe": str(qtype),
+                    "rate": float(rate),
+                    "resp": total,
+                }
+            )
 
-    results = []
-    for qtype, rate in rates_sorted.items():
-        results.append(
-            {
-                "tipe": str(qtype),
-                "rate": float(rate),
-                "resp": int(filtered_counts[qtype]),
-            }
-        )
-
+    results.sort(key=lambda x: x["rate"], reverse=True)
     return results

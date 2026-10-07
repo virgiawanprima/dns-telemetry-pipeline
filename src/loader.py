@@ -3,6 +3,7 @@
 import logging
 import time
 from pathlib import Path
+from typing import Any, cast
 
 import pandas as pd
 
@@ -37,7 +38,7 @@ def load_dns_telemetry(
     df = pd.read_csv(
         path,
         engine="c",
-        dtype=DNS_SCHEMA_DTYPES,
+        dtype=cast(Any, DNS_SCHEMA_DTYPES),
         keep_default_na=False,
         na_values=[""],
         nrows=sample_size,

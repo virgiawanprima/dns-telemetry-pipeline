@@ -16,6 +16,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
@@ -49,18 +50,21 @@ logging.basicConfig(
 logger = logging.getLogger("dns_pipeline")
 
 
+def _floor_minute(series: Any) -> pd.Series:
+    """Floor datetime series to 1-minute intervals with robust type casting."""
+    return cast(pd.Series, cast(Any, series).dt.floor("1min"))
+
+
 def run_pipeline(
     input_path: Path,
     output_dir: Path,
     sample_size: int | None = None,
     engine: str = "pandas",
     validate: bool = False,
-) -> None:
+) -> dict[str, Any]:
     """Execute end-to-end DNS telemetry data engineering pipeline."""
     total_start = time.perf_counter()
-    logger.info("=================================================================")
-    logger.info(f" DNS TELEMETRY PIPELINE (Engine: {engine.upper()}) ")
-    logger.info("=================================================================")
+    logger.info(f"DNS Telemetry Pipeline initiated (Engine: {engine.upper()})")
 
     # 1. Ingestion
     df, _load_stats = load_dns_telemetry(input_path, sample_size=sample_size)
@@ -89,16 +93,16 @@ def run_pipeline(
     logger.info("Generating operational priority tables...")
     q_mask = df["qr"] == 0
     r_mask = df["qr"] == 1
-    in_steady = df["dt"].dt.floor("1min").isin(temporal_steady.index)
+    in_steady = _floor_minute(df["dt"]).isin(temporal_steady.index)
 
     q_work = df.loc[q_mask & in_steady, ["src_ip", "dt"]].copy()
-    q_work["minute"] = q_work["dt"].dt.floor("1min")
+    q_work["minute"] = _floor_minute(q_work["dt"])
     q_unique_ips = q_work["src_ip"].dropna().unique()
     q_prefix_lookup = {ip: get_subnet_prefix(ip) for ip in q_unique_ips}
     q_work["prefix"] = q_work["src_ip"].map(q_prefix_lookup)
 
     r_view = df.loc[r_mask & in_steady, ["dst_ip", "rcode", "dt"]].copy()
-    r_view["minute"] = r_view["dt"].dt.floor("1min")
+    r_view["minute"] = _floor_minute(r_view["dt"])
     r_unique_ips = r_view["dst_ip"].dropna().unique()
     r_prefix_lookup = {ip: get_subnet_prefix(ip) for ip in r_unique_ips}
     r_view["prefix"] = r_view["dst_ip"].map(r_prefix_lookup)
@@ -109,18 +113,19 @@ def run_pipeline(
     logger.info("Decomposing peak minute error burst...")
     peak_min = meta_temporal["peak_minute"]
     nx_rows = df.loc[df["rcode"] == 3, ["dst_ip", "qname", "qtype_name", "dt"]].copy()
-    nx_rows["minute"] = nx_rows["dt"].dt.floor("1min")
+    nx_rows["minute"] = _floor_minute(nx_rows["dt"])
 
-    if len(temporal_steady.index) >= 2 and peak_min in temporal_steady.index:
+    steady_minute_idx = pd.DatetimeIndex(temporal_steady.index)
+    if len(steady_minute_idx) >= 2 and peak_min in steady_minute_idx:
         # Host delta
-        delta_host, nx_sum = nx_delta(nx_rows, temporal_steady.index, peak_min, group="dst_ip")
+        delta_host, nx_sum = nx_delta(nx_rows, steady_minute_idx, peak_min, group="dst_ip")
         # Record type delta
-        delta_qt, _ = nx_delta(nx_rows, temporal_steady.index, peak_min, group="qtype_name")
+        delta_qt, _ = nx_delta(nx_rows, steady_minute_idx, peak_min, group="qtype_name")
         # Registrable domain delta (memoized over unique names for high performance)
         unique_qnames = nx_rows["qname"].dropna().unique()
         reg_lookup = {q: extract_registrable_domain(q) for q in unique_qnames}
         nx_rows["reg_domain"] = nx_rows["qname"].map(reg_lookup)
-        delta_reg, _ = nx_delta(nx_rows, temporal_steady.index, peak_min, group="reg_domain")
+        delta_reg, _ = nx_delta(nx_rows, steady_minute_idx, peak_min, group="reg_domain")
     else:
         logger.info(
             "Fewer than 2 canonical steady-state minutes; skipping peak-minute delta decomposition."
@@ -148,9 +153,9 @@ def run_pipeline(
     t_max = df["dt"].max()
     duration_sec = max((t_max - t_min).total_seconds(), 1.0)
     total_packets = len(df)
-    total_q = int(q_mask.sum())
-    total_r = int(r_mask.sum())
-    nx_count = int((df["rcode"] == 3).sum())
+    total_q = q_mask.sum()
+    total_r = r_mask.sum()
+    nx_count = (df["rcode"] == 3).sum()
     nx_rate_all = (nx_count / max(total_r, 1)) * 100.0
 
     s1_share = f"{pareto_df.loc[0, 'Share (%)']:.1f}%" if len(pareto_df) > 0 else "0.0%"
@@ -176,8 +181,8 @@ def run_pipeline(
         {"judul": "Pangsa S1", "nilai": s1_share, "cakupan": "rekaman penuh"},
     ]
 
-    h_map = {h: f"H{i + 1}" for i, h in enumerate(delta_host.head(10).index)}
-    r_map = {r: f"R{i + 1}" for i, r in enumerate(delta_reg.head(5).index)}
+    h_map = {str(h): f"H{i + 1}" for i, h in enumerate(delta_host.head(10).index)}
+    r_map = {str(r): f"R{i + 1}" for i, r in enumerate(delta_reg.head(5).index)}
 
     payload = {
         "meta": {
@@ -186,7 +191,7 @@ def run_pipeline(
             "periode_mulai": t_min.isoformat(),
             "periode_akhir": t_max.isoformat(),
             "n_menit_kanonik": int(meta_temporal["n_minutes"]),
-            "n_pesan": int(total_packets),
+            "n_pesan": total_packets,
             "n_query": total_q,
             "n_respons": total_r,
         },
@@ -211,45 +216,47 @@ def run_pipeline(
             },
         },
         "pareto": {
-            "label": [anon_map.get(p, p) for p in pareto_df["Subnet Prefix"]],
+            "label": [anon_map.get(str(p), str(p)) for p in pareto_df["Subnet Prefix"]],
             "share": [float(v) for v in pareto_df["Share (%)"]],
             "kumulatif": [float(v) for v in pareto_df["Kumulatif (%)"]],
         },
         "prioritas_beban": [
             {
-                "subnet": anon_map.get(pfx, pfx),
-                "query": int(r["query"]),
-                "share": float(r["share_pct"]),
-                "menit": int(r["menit_aktif"]),
-                "alasan": r["Alasan Prioritas"],
+                "subnet": anon_map.get(str(pfx), str(pfx)),
+                "query": int(cast(Any, r)["query"]),
+                "share": float(cast(Any, r)["share_pct"]),
+                "menit": int(cast(Any, r)["menit_aktif"]),
+                "alasan": str(cast(Any, r)["Alasan Prioritas"]),
             }
             for pfx, r in f1_priority.iterrows()
         ],
         "prioritas_nx": [
             {
-                "subnet": anon_map.get(pfx, pfx),
-                "respons": int(r["respons"]),
-                "nxdomain": int(r["nxdomain"]),
-                "nx_rate": float(r["nx_rate_pct"]),
-                "alasan": r["Alasan Prioritas"],
+                "subnet": anon_map.get(str(pfx), str(pfx)),
+                "respons": int(cast(Any, r)["respons"]),
+                "nxdomain": int(cast(Any, r)["nxdomain"]),
+                "nx_rate": float(cast(Any, r)["nx_rate_pct"]),
+                "alasan": str(cast(Any, r)["Alasan Prioritas"]),
             }
             for pfx, r in f2_priority.iterrows()
         ],
         "bubble": {
             "titik": [
                 {
-                    "label": anon_map.get(pfx, pfx),
-                    "query": int(r["query"]),
-                    "nx_rate": None if pd.isna(r["nx_rate_pct"]) else float(r["nx_rate_pct"]),
-                    "respons": int(r["respons"]),
-                    "nx_tinggi": bool(r["nx_rate_pct"] >= 25.0),
+                    "label": anon_map.get(str(pfx), str(pfx)),
+                    "query": int(cast(Any, r)["query"]),
+                    "nx_rate": None
+                    if pd.isna(cast(Any, r)["nx_rate_pct"])
+                    else float(cast(Any, r)["nx_rate_pct"]),
+                    "respons": int(cast(Any, r)["respons"]),
+                    "nx_tinggi": float(cast(Any, r)["nx_rate_pct"]) >= 25.0,
                 }
                 for pfx, r in pd.concat([f1_priority, f2_priority]).drop_duplicates().iterrows()
             ],
             "tak_terplot": [],
         },
         "small_multiples": {
-            "label": [anon_map.get(p, p) for p in pareto_df["Subnet Prefix"].head(3)],
+            "label": [anon_map.get(str(p), str(p)) for p in pareto_df["Subnet Prefix"].head(3)],
             "share": [float(v) for v in pareto_df["Share (%)"].head(3)],
             "waktu": [m.strftime("%H:%M") for m in temporal_steady.index],
             "seri": [],
@@ -262,11 +269,12 @@ def run_pipeline(
                 for k, v in nx_sum.items()
             },
             "host": [
-                {"label": h_map.get(h, h), "delta": float(d)}
+                {"label": h_map.get(str(h), str(h)), "delta": float(d)}
                 for h, d in delta_host.head(10).items()
             ],
             "reg": [
-                {"label": r_map.get(r, r), "delta": float(d)} for r, d in delta_reg.head(5).items()
+                {"label": r_map.get(str(r), str(r)), "delta": float(d)}
+                for r, d in delta_reg.head(5).items()
             ],
             "reg_nilai": [float(d) for d in delta_reg.head(5).values],
             "qtype": [{"tipe": str(k), "delta": float(d)} for k, d in delta_qt.head(3).items()],
@@ -301,10 +309,8 @@ def run_pipeline(
     export_metrics_summary(payload, summary_path)
 
     total_elapsed = time.perf_counter() - total_start
-    logger.info("=================================================================")
-    logger.info(f" Pipeline executed successfully in {total_elapsed:.2f} seconds! ")
-    logger.info(f" Metrics summary exported: {summary_path}")
-    logger.info("=================================================================")
+    logger.info(f"Pipeline executed successfully in {total_elapsed:.2f} seconds.")
+    logger.info(f"Metrics summary exported: {summary_path}")
     return payload
 
 

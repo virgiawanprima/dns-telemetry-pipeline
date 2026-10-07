@@ -2,7 +2,7 @@
 
 import logging
 import math
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
@@ -35,7 +35,7 @@ def calculate_entropy(s: str) -> float:
 
 
 def nx_delta(
-    nx_rows: pd.DataFrame, minute_index: pd.DatetimeIndex, peak: pd.Timestamp, group: str = "dst_ip"
+    nx_rows: pd.DataFrame, minute_index: pd.DatetimeIndex, peak: Any, group: str = "dst_ip"
 ) -> tuple[pd.Series, dict[str, Any]]:
     """Decompose peak minute NXDOMAIN increase against other steady-state minutes.
 
@@ -46,7 +46,7 @@ def nx_delta(
     if idx.has_duplicates or peak not in idx or len(idx) < 2:
         raise ValueError("Minute index must be unique, contain peak, and have at least 2 minutes.")
 
-    work = nx_rows.loc[nx_rows["minute"].isin(idx)]
+    work = nx_rows.loc[nx_rows["minute"].isin(list(idx))]
     if work[group].isna().any():
         raise ValueError(f"Group column '{group}' contains NaN values.")
 
@@ -60,7 +60,7 @@ def nx_delta(
     delta = (a.reindex(union, fill_value=0) - b.reindex(union, fill_value=0)).sort_values(
         ascending=False
     )
-    peak_total = int(at_peak.sum())
+    peak_total = at_peak.sum()
     baseline = float((~at_peak).sum()) / n_other
     net = float(peak_total - baseline)
 
@@ -88,38 +88,45 @@ def compute_priority_tables(
     - Load priority: highest query volume and steady activity.
     - Anomaly priority: high NXDOMAIN counts and high NX failure percentage (>25%).
     """
-    qn = q_work.groupby("prefix", observed=True).size().rename("query")
-    active = q_work.groupby("prefix", observed=True)["minute"].nunique().rename("menit_aktif")
-    rn = r_view.groupby("prefix", observed=True).size().rename("respons")
-    nx = (
-        r_view.loc[r_view["rcode"].eq(3)].groupby("prefix", observed=True).size().rename("nxdomain")
-    )
+    qn = q_work.groupby("prefix", observed=True).size()
+    active = q_work.groupby("prefix", observed=True)["minute"].nunique()
+    rn = r_view.groupby("prefix", observed=True).size()
+    nx = r_view.loc[r_view["rcode"].eq(3)].groupby("prefix", observed=True).size()
 
-    out = pd.concat([qn, active, rn, nx], axis=1).fillna(0).astype("int64")
+    out = (
+        pd.concat({"query": qn, "menit_aktif": active, "respons": rn, "nxdomain": nx}, axis=1)
+        .fillna(0)
+        .astype("int64")
+    )
     out.index.name = "prefix"
     out["nx_rate_pct"] = 100.0 * out["nxdomain"] / out["respons"].replace(0, np.nan)
-    total_q = out["query"].sum()
-    out["share_pct"] = 100.0 * out["query"] / total_q if total_q else np.nan
+    total_q = float(cast(Any, out["query"].sum()))
+    out["share_pct"] = 100.0 * out["query"] / total_q if total_q > 0 else np.nan
 
     # Priority 1: Query load
     f1 = out.sort_values(by=["query", "menit_aktif"], ascending=[False, False]).head(10).copy()
-    f1["Alasan Prioritas"] = np.where(
-        f1["query"] >= 40000,
-        "volume terbesar; aktif hampir sepanjang periode",
-        "aktif hampir sepanjang periode",
-    )
+    f1["Alasan Prioritas"] = [
+        "volume terbesar; aktif hampir sepanjang periode"
+        if q >= 40000
+        else "aktif hampir sepanjang periode"
+        for q in f1["query"]
+    ]
 
     # Priority 2: NXDOMAIN errors
-    f2_candidates = out[out["respons"] >= 1000].copy()
+    f2_candidates = out.query("respons >= 1000").copy()
     f2 = (
         f2_candidates.sort_values(by=["nxdomain", "nx_rate_pct"], ascending=[False, False])
         .head(10)
         .copy()
     )
-    f2["Alasan Prioritas"] = np.where(
-        f2["nx_rate_pct"] >= 75.0,
-        "volume NX terbesar; NX rate tinggi",
-        np.where(f2["nx_rate_pct"] >= 25.0, "NX rate tinggi", "rasio perlu dipantau"),
-    )
+    reasons = []
+    for rate in f2["nx_rate_pct"]:
+        if rate >= 75.0:
+            reasons.append("volume NX terbesar; NX rate tinggi")
+        elif rate >= 25.0:
+            reasons.append("NX rate tinggi")
+        else:
+            reasons.append("rasio perlu dipantau")
+    f2["Alasan Prioritas"] = reasons
 
     return f1, f2
