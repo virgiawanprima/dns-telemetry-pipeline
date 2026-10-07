@@ -1,0 +1,101 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-and-format:
+    name: Code Quality & Linting
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Linting Tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff
+
+      - name: Check Code Formatting (Ruff)
+        run: ruff format --check .
+
+      - name: Run Linter (Ruff)
+        run: ruff check .
+
+  test-suite:
+    name: Unit Tests & Data Contracts (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    needs: lint-and-format
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Pytest Suite
+        run: |
+          pytest tests/ -v
+
+  dbt-pipeline:
+    name: dbt Models & Quality Contracts
+    runs-on: ubuntu-latest
+    needs: lint-and-format
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Generate Synthetic CI Parquet Fixture
+        run: |
+          python scripts/generate_sample_data.py --rows 2000 --force
+
+      - name: dbt Parse & Compile
+        run: |
+          dbt parse --project-dir dbt_dns --profiles-dir dbt_dns
+          dbt compile --project-dir dbt_dns --profiles-dir dbt_dns
+
+      - name: dbt Run (Staging & Data Marts)
+        run: |
+          dbt run --project-dir dbt_dns --profiles-dir dbt_dns
+
+      - name: dbt Test (12 Data Quality Assertions)
+        run: |
+          dbt test --project-dir dbt_dns --profiles-dir dbt_dns

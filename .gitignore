@@ -1,0 +1,65 @@
+# ==============================================================================
+# Git Ignore Configuration - DNS Telemetry Pipeline (Data Confidentiality Protected)
+# ==============================================================================
+
+# 1. Confidential & Restricted Data (Keep ALL real data local)
+data/*
+!data/.gitkeep
+*.pcap
+*.pcapng
+*.csv
+*.parquet
+*.duckdb
+*.duckdb.wal
+
+# 2. Execution Artifacts & Analytical Outputs (Prevent publishing derived data)
+output/*
+!output/.gitkeep
+*.jsonl
+metrics_summary.json
+
+# 3. dbt Execution Artifacts, Logs, and Anonymous Identifiers
+dbt_dns/target/
+dbt_dns/logs/
+dbt_dns/dbt_packages/
+dbt_dns/.user.yml
+.user.yml
+*.log
+
+# 4. Secrets, Credentials, and Local Environment Variables
+.env
+.env.*
+*.pem
+*.key
+*.cert
+*.p12
+*.id_rsa
+*.token
+*.secret
+credentials*.json
+service-account*.json
+service_account*.json
+
+# 5. Python Environment & Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.venv/
+venv/
+ENV/
+env/
+
+# 6. IDE, Testing, and Linter Caches
+.vscode/
+.idea/
+*.swp
+*.swo
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# 7. OS Specific
+.DS_Store
+Thumbs.db

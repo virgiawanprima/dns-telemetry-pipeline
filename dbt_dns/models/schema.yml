@@ -1,0 +1,54 @@
+version: 2
+
+models:
+  - name: stg_dns_packets
+    description: "Staged raw DNS packet telemetry with typed schemas and IPv6 prefix extraction"
+    columns:
+      - name: packet_timestamp
+        description: "UTC packet timestamp"
+        tests:
+          - not_null
+      - name: message_type
+        description: "0 for Query, 1 for Response"
+        tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]
+      - name: protocol
+        description: "Transport protocol"
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['udp', 'tcp']
+      - name: response_code
+        description: "DNS RCODE integer (0=NOERROR, 3=NXDOMAIN, etc.) for response packets"
+        tests:
+          - not_null:
+              config:
+                where: "message_type = 1"
+
+  - name: fct_temporal_metrics
+    description: "Minute-by-minute steady-state DNS network performance aggregates"
+    columns:
+      - name: packet_minute
+        description: "1-minute temporal bucket"
+        tests:
+          - not_null
+          - unique
+      - name: total_packets
+        description: "Total packet count per minute"
+        tests:
+          - not_null
+
+  - name: fct_pareto_prefix
+    description: "Pareto 80/20 query concentration ranking by IPv6 /48 prefix"
+    columns:
+      - name: prefix_rank
+        description: "Rank 1..N based on total query volume"
+        tests:
+          - not_null
+          - unique
+      - name: src_prefix_48
+        description: "Client subnet prefix"
+        tests:
+          - not_null

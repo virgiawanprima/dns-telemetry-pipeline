@@ -1,0 +1,28 @@
+[project]
+name = "dns-telemetry-pipeline"
+version = "1.0.0"
+description = "High-performance DNS telemetry and operational analytics pipeline"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Data Engineering Team" }]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-v --strict-markers"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+exclude = [
+    "notebooks",
+    ".venv",
+    "dbt_dns/target",
+    "dbt_dns/dbt_packages",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+ignore = ["E501", "E402"]
