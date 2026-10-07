@@ -9,6 +9,7 @@
 - [Tentang](#tentang)
 - [Fitur Utama](#fitur-utama)
 - [Tech Stack](#tech-stack)
+- [Dataset dan Kamus Data](#dataset-dan-kamus-data)
 - [Arsitektur Sistem](#arsitektur-sistem)
 - [Benchmark Performa](#benchmark-performa)
 - [Pemodelan Data dan dbt](#pemodelan-data-dan-dbt)
@@ -59,6 +60,51 @@ Repositori ini mengimplementasikan pipeline rekayasa data (*data engineering*) b
 | Data Quality | Pandera | 0.34.1 | Penegakan kontrak skema data (*data contracts*) dan validasi kepatuhan tipe protokol |
 | Baseline Engine | Pandas & NumPy | 3.0.6 / 2.5.3 | Pemrosesan data tabular alternatif dan operasi array numerik |
 | Ekstraksi Domain | PublicSuffix2 | 2.20191221 | Ekstraksi SLD (*Second-Level Domain*) resmi berbasis Public Suffix List |
+
+---
+
+## Dataset dan Kamus Data
+
+Dataset telemetri yang diproses oleh pipeline ini merupakan rekaman log transaksi paket DNS (*DNS network packet telemetry*) pada server nama otoritatif dalam jendela observasi 30 menit. Setiap baris data merepresentasikan satu paket jaringan DNS individual (baik paket kueri masuk maupun respons keluar), lengkap dengan metadata lapisan transport (IPv4/IPv6, UDP/TCP), rincian header DNS RFC 1035, flag resolusi, kode status galat, serta opsi ekstensi EDNS0 (RFC 6891).
+
+### Kamus Data (Data Dictionary)
+
+| Kolom | Tipe data | Arti |
+|---|---|---|
+| `ts` | Float64 / Double | Waktu penangkapan paket dalam format UNIX epoch timestamp (detik dengan presisi mikrodetik UTC). |
+| `ts_iso` | Timestamp (UTC) | Waktu penangkapan paket dalam format standar ISO-8601 UTC (`YYYY-MM-DDTHH:MM:SSZ`). |
+| `ip_ver` | Int8 | Versi protokol Internet yang digunakan: `4` untuk IPv4 atau `6` untuk IPv6. |
+| `proto` | Varchar / Category | Protokol lapisan transport jaringan: `udp` atau `tcp`. |
+| `src_ip` | Varchar / String | Alamat IP pengirim (IP sumber klien pada query, atau IP server penanggap pada response). |
+| `src_port` | UInt16 | Nomor port sumber pada lapisan transport (rentang dinamis klien 1024 - 65535). |
+| `dst_ip` | Varchar / String | Alamat IP tujuan (IP server DNS pada query, atau IP klien penerima pada response). |
+| `dst_port` | UInt16 | Nomor port tujuan pada lapisan transport (standar port 53 untuk layanan DNS). |
+| `frame_len` | UInt32 | Panjang total frame paket jaringan yang tertangkap dalam satuan byte. |
+| `dns_len` | UInt32 | Panjang payload lapisan protokol DNS dalam satuan byte. |
+| `dns_id` | UInt16 | Transaction Identifier (ID transaksi DNS 16-bit) untuk mencocokkan query klien dengan respons server. |
+| `qr` | Int8 | Flag arah pesan DNS: `0` untuk Pertanyaan (Query), `1` untuk Tanggapan (Response). |
+| `opcode` | Int8 | Jenis operasi query DNS RFC 1035 (`0` = Standard Query / QUERY, `1` = IQUERY, `2` = STATUS). |
+| `aa` | Int8 | Flag Authoritative Answer: `1` jika server penanggap adalah otoritatif atas domain yang diminta, `0` jika bukan. |
+| `tc` | Int8 | Flag Truncation: `1` jika pesan terpotong karena melampaui batas transmisi UDP, `0` jika utuh. |
+| `rd` | Int8 | Flag Recursion Desired: `1` jika klien meminta server melakukan resolusi rekursif, `0` jika iteratif. |
+| `ra` | Int8 | Flag Recursion Available: `1` jika server mendukung layanan resolusi rekursif, `0` jika tidak tersedia. |
+| `ad` | Int8 | Flag Authentic Data (DNSSEC): `1` jika seluruh data jawaban telah diverifikasi secara kriptografis oleh server. |
+| `cd` | Int8 | Flag Checking Disabled (DNSSEC): `1` jika klien menonaktifkan verifikasi keamanan DNSSEC oleh server. |
+| `rcode` | Int16 | Kode hasil respons DNS RFC 1035/8914 (`0` = NOERROR, `1` = FORMERR, `2` = SERVFAIL, `3` = NXDOMAIN, `5` = REFUSED; bernilai null pada query). |
+| `qdcount` | UInt16 | Jumlah rekaman entri pertanyaan dalam seksi pertanyaan (Question Section) header DNS. |
+| `ancount` | UInt16 | Jumlah rekaman data jawaban (Answer Resource Records) yang dikembalikan dalam respons. |
+| `nscount` | UInt16 | Jumlah rekaman server nama otoritatif (Authority Records) dalam respons. |
+| `arcount` | UInt16 | Jumlah rekaman tambahan (Additional Records) dalam respons, termasuk record opsi EDNS. |
+| `qname` | Varchar / String | Nama domain lengkap (Fully Qualified Domain Name / FQDN) yang ditanyakan oleh klien (contoh: `example.com.`). |
+| `qtype` | UInt16 | Kode numerik tipe rekaman DNS yang diminta (`1` = A, `28` = AAAA, `15` = MX, `16` = TXT, `255` = ANY). |
+| `qtype_name` | Varchar / Category | Representasi label string dari tipe kueri DNS (contoh: `A`, `AAAA`, `MX`, `TXT`, `ANY`). |
+| `qclass` | UInt16 | Kelas kueri DNS (`1` = IN / Internet Class). |
+| `edns` | Int8 | Flag keberadaan ekstensi EDNS0 RFC 6891: `1` jika menyertakan pseudo-RR OPT, `0` jika DNS standar. |
+| `edns_udpsize` | UInt16 | Ukuran buffer payload UDP maksimum yang dapat diterima oleh resolver klien (contoh: 1232 atau 4096 byte). |
+| `do` | Int8 | Flag DNSSEC OK dalam OPT RR: `1` jika resolver klien siap menerima rekaman keamanan DNSSEC (RRSIG, DNSKEY). |
+| `ecs` | Varchar / String | Subnet prefix klien dari opsi EDNS Client Subnet (RFC 7871) jika disertakan dalam query/response. |
+| `ecs_scope` | Int16 / BigInt | Panjang cakupan prefix (scope prefix-length) dari opsi EDNS Client Subnet. |
+| `answers` | Varchar / String | Serialisasi string representasi data rekaman jawaban DNS (Resource Record values). |
 
 ---
 
