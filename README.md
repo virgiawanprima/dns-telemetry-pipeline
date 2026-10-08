@@ -1,55 +1,55 @@
-# Pipeline Telemetri & Analisis Operasional DNS (11,7 Juta Pesan)
+# 🚀 Pipeline Telemetri & Analisis Operasional DNS (11,7 Juta Pesan)
 
 > Pipeline rekayasa data berkecepatan tinggi berbasis Modern Data Stack (DuckDB, Apache Parquet, dbt Core, Pandera) untuk pemrosesan log DNS skala besar, pemodelan analitik, dan penegakan kontrak kualitas data.
 
 ---
 
-## Daftar Isi
+## 📋 Daftar Isi
 
-- [Tentang](#tentang)
-- [Fitur Utama](#fitur-utama)
-- [Tech Stack](#tech-stack)
-- [Dataset dan Kamus Data](#dataset-dan-kamus-data)
-- [Arsitektur Sistem](#arsitektur-sistem)
-- [Benchmark Performa](#benchmark-performa)
-- [Pemodelan Data dan dbt](#pemodelan-data-dan-dbt)
-- [Kontrak Kualitas Data](#kontrak-kualitas-data)
-- [Perlindungan Data dan Keamanan](#perlindungan-data-dan-keamanan)
-- [Struktur Repositori](#struktur-repositori)
-- [Mulai Cepat](#mulai-cepat)
-- [Aturan Merge dan Perlindungan Branch](#aturan-merge-dan-perlindungan-branch)
-- [Modul dan Komponen](#modul-dan-komponen)
-- [Temuan Operasional](#temuan-operasional)
-- [Angka Kunci dan Sumber](#angka-kunci-dan-sumber)
-- [Pemecahan Masalah](#pemecahan-masalah)
-- [Lisensi](#lisensi)
+- [📖 Tentang](#tentang)
+- [✨ Fitur Utama](#fitur-utama)
+- [🛠️ Tech Stack](#tech-stack)
+- [📊 Dataset dan Kamus Data](#dataset-dan-kamus-data)
+- [🏗️ Arsitektur Sistem](#arsitektur-sistem)
+- [⚡ Benchmark Performa](#benchmark-performa)
+- [🔄 Pemodelan Data dan dbt](#pemodelan-data-dan-dbt)
+- [🛡️ Kontrak Kualitas Data](#kontrak-kualitas-data)
+- [🔒 Perlindungan Data dan Keamanan](#perlindungan-data-dan-keamanan)
+- [📂 Struktur Repositori](#struktur-repositori)
+- [🚀 Mulai Cepat](#mulai-cepat)
+- [🌿 Aturan Merge dan Perlindungan Branch](#aturan-merge-dan-perlindungan-branch)
+- [🧩 Modul dan Komponen](#modul-dan-komponen)
+- [📈 Temuan Operasional](#temuan-operasional)
+- [🔢 Angka Kunci dan Sumber](#angka-kunci-dan-sumber)
+- [❓ Pemecahan Masalah](#pemecahan-masalah)
+- [📜 Lisensi](#lisensi)
 
 ---
 
-## Tentang
+## 📖 Tentang
 
 Repositori ini mengimplementasikan pipeline rekayasa data (*data engineering*) berstandar industri modern (*Modern Data Stack*) untuk memproses **11.712.623 rekaman telemetri DNS otoritatif** (2,28 GB data mentah) dalam jendela pengamatan 30 menit.
 
-### Masalah yang Dijawab
-1. **Optimalisasi Penyimpanan dan Throughput**: Mengonversi berkas CSV besar menjadi Apache Parquet terkompresi ZSTD, mereduksi konsumsi ruang disk hingga **89,1% (dari 2.285 MB menjadi 250 MB)** hanya dalam 6,55 detik.
-2. **Pemrosesan Kolumnar Sub-Detik**: Menggantikan pemindaian baris tradisional dengan mesin kolumnar **DuckDB** yang mampu mengeksekusi analitik skala 11,7 juta baris hingga **71x lebih cepat** dibandingkan Pandas.
-3. **Standardisasi Pemodelan Data Enterprise**: Mengintegrasikan **dbt Core** dengan adapter `dbt-duckdb` untuk orkestrasi transformasi modular (lapisan *staging* dan *data marts*) lengkap dengan pengujian otomatis (*schema tests*).
-4. **Penegakan Kontrak Kualitas Data**: Menerapkan validasi skema berbasis **Pandera** untuk memastikan kepatuhan protokol RFC sebelum data masuk ke lapisan analitik.
+### 🎯 Masalah yang Dijawab
+1. 💾 **Optimalisasi Penyimpanan dan Throughput**: Mengonversi berkas CSV besar menjadi Apache Parquet terkompresi ZSTD, mereduksi konsumsi ruang disk hingga **89,1% (dari 2.285 MB menjadi 250 MB)** hanya dalam 6,55 detik.
+2. ⚡ **Pemrosesan Kolumnar Sub-Detik**: Menggantikan pemindaian baris tradisional dengan mesin kolumnar **DuckDB** yang mampu mengeksekusi analitik skala 11,7 juta baris hingga **71x lebih cepat** dibandingkan Pandas.
+3. 🔄 **Standardisasi Pemodelan Data Enterprise**: Mengintegrasikan **dbt Core** dengan adapter `dbt-duckdb` untuk orkestrasi transformasi modular (lapisan *staging* dan *data marts*) lengkap dengan pengujian otomatis (*schema tests*).
+4. 🛡️ **Penegakan Kontrak Kualitas Data**: Menerapkan validasi skema berbasis **Pandera** untuk memastikan kepatuhan protokol RFC sebelum data masuk ke lapisan analitik.
 
 ---
 
-## Fitur Utama
+## ✨ Fitur Utama
 
-- **Storage Lakehouse Parquet**: Konversi otomatis CSV ke Parquet terkompresi ZSTD dengan penghematan ruang sebesar 89,1%.
-- **Dual Analytical Engine**: Dukungan eksekusi fleksibel melalui mesin Pandas C-engine maupun mesin kolumnar DuckDB berkecepatan tinggi.
-- **dbt Data Transformation Layer**: Model *staging* (`stg_dns_packets`) dan 3 model *marts* (`fct_temporal_metrics`, `fct_pareto_prefix`, `fct_protocol_matrix`) yang tereksekusi penuh dalam 4,13 detik.
-- **Automated Data Quality Testing**: 16 *data tests* dbt (12 uji skema generik dan 4 uji singular rekonsiliasi analitik) yang lulus 100%, ditambah kontrak skema protokol via Pandera.
-- **Deterministic Spike Decomposition**: Membedah lonjakan galat NXDOMAIN menit puncak terhadap *steady-state baseline* secara matematis.
-- **JSON Telemetry Export**: Serialisasi data metrik terkomputasi ke berkas JSON terstruktur untuk konsumsi hilir (*downstream consumption*).
+- 💾 **Storage Lakehouse Parquet**: Konversi otomatis CSV ke Parquet terkompresi ZSTD dengan penghematan ruang sebesar 89,1%.
+- ⚙️ **Dual Analytical Engine**: Dukungan eksekusi fleksibel melalui mesin Pandas C-engine maupun mesin kolumnar DuckDB berkecepatan tinggi.
+- 🔄 **dbt Data Transformation Layer**: Model *staging* (`stg_dns_packets`) dan 3 model *marts* (`fct_temporal_metrics`, `fct_pareto_prefix`, `fct_protocol_matrix`) yang tereksekusi penuh dalam 4,13 detik.
+- 🛡️ **Automated Data Quality Testing**: 16 *data tests* dbt (12 uji skema generik dan 4 uji singular rekonsiliasi analitik) yang lulus 100%, ditambah kontrak skema protokol via Pandera.
+- 🔍 **Deterministic Spike Decomposition**: Membedah lonjakan galat NXDOMAIN menit puncak terhadap *steady-state baseline* secara matematis.
+- 📦 **JSON Telemetry Export**: Serialisasi data metrik terkomputasi ke berkas JSON terstruktur untuk konsumsi hilir (*downstream consumption*).
 
 ---
 
-## Tech Stack
+## 🛠️ Tech Stack
 
 | Komponen | Teknologi | Versi | Peran dan Alasan Pemilihan |
 |---|---|---|---|
@@ -63,11 +63,11 @@ Repositori ini mengimplementasikan pipeline rekayasa data (*data engineering*) b
 
 ---
 
-## Dataset dan Kamus Data
+## 📊 Dataset dan Kamus Data
 
 Dataset telemetri yang diproses oleh pipeline ini merupakan rekaman log transaksi paket DNS (*DNS network packet telemetry*) pada server nama otoritatif dalam jendela observasi 30 menit. Setiap baris data merepresentasikan satu paket jaringan DNS individual (baik paket kueri masuk maupun respons keluar), lengkap dengan metadata lapisan transport (IPv4/IPv6, UDP/TCP), rincian header DNS RFC 1035, flag resolusi, kode status galat, serta opsi ekstensi EDNS0 (RFC 6891).
 
-### Kamus Data (Data Dictionary)
+### 📚 Kamus Data (Data Dictionary)
 
 | Kolom | Tipe data | Arti |
 |---|---|---|
@@ -108,7 +108,7 @@ Dataset telemetri yang diproses oleh pipeline ini merupakan rekaman log transaks
 
 ---
 
-## Arsitektur Sistem
+## 🏗️ Arsitektur Sistem
 
 Alur data terstruktur mengikuti prinsip *Lakehouse & Modern Data Stack*:
 
@@ -132,7 +132,7 @@ flowchart TD
 
 ---
 
-## Benchmark Performa
+## ⚡ Benchmark Performa
 
 Uji performa perbandingan mesin analitik dijalankan pada dataset DNS dengan parameter lingkungan yang identik:
 
@@ -142,15 +142,15 @@ Uji performa perbandingan mesin analitik dijalankan pada dataset DNS dengan para
 | DuckDB (Direct Scan) | CSV Mentah (2,28 GB) | 0,22 detik | 0,0 MB | **6,0x lebih cepat** |
 | DuckDB (Columnar Scan) | Parquet ZSTD (250 MB) | 0,02 detik | 0,0 MB | **71,8x lebih cepat** |
 
-### Efisiensi Kompresi Storage
-- **Ukuran CSV Mentah**: 2.285,2 MB
-- **Ukuran Parquet ZSTD**: 250,0 MB
-- **Pengurangan Ruang Disk**: **89,1% hemat ruang**
-- **Waktu Konversi**: **6,55 detik** (throughput konversi ~350 MB/detik)
+### 🗜️ Efisiensi Kompresi Storage
+- 📄 **Ukuran CSV Mentah**: 2.285,2 MB
+- 📦 **Ukuran Parquet ZSTD**: 250,0 MB
+- 📉 **Pengurangan Ruang Disk**: **89,1% hemat ruang**
+- ⏱️ **Waktu Konversi**: **6,55 detik** (throughput konversi ~350 MB/detik)
 
 ---
 
-## Pemodelan Data dan dbt
+## 🔄 Pemodelan Data dan dbt
 
 Transformasi data dimodelkan secara modular di dalam direktori `dbt_dns/`:
 
@@ -161,38 +161,38 @@ Transformasi data dimodelkan secara modular di dalam direktori `dbt_dns/`:
 | `fct_pareto_prefix` | Marts | Table | Pemeringkatan prefiks sumber /48 berdasarkan volume kueri beserta kalkulasi pangsa kumulatif Pareto 80/20 |
 | `fct_protocol_matrix` | Marts | Table | Tabulasi silang distribusi kode respons RCODE untuk setiap tipe rekaman QTYPE |
 
-### Hasil Eksekusi dbt
-- **Transformasi (`dbt run`)**: 4 model selesai dalam **4,13 detik**.
-- **Pengujian Kualitas Data (`dbt test`)**: 16 pengujian data (12 uji skema generik *not-null*, *unique*, *accepted values* serta 4 uji singular rekonsiliasi analitik) lulus 100% dalam **0,62 detik**.
+### ⏱️ Hasil Eksekusi dbt
+- 🚀 **Transformasi (`dbt run`)**: 4 model selesai dalam **4,13 detik**.
+- 🧪 **Pengujian Kualitas Data (`dbt test`)**: 16 pengujian data (12 uji skema generik *not-null*, *unique*, *accepted values* serta 4 uji singular rekonsiliasi analitik) lulus 100% dalam **0,62 detik**.
 
 ---
 
-## Kontrak Kualitas Data
+## 🛡️ Kontrak Kualitas Data
 
 Melalui modul `src/validation.py`, penegakan kontrak skema berbasis Pandera memeriksa data sebelum kalkulasi analitik dijalankan. Proyek ini membedakan secara tegas antara batasan protokol jaringan standar (RFC) dan kebijakan operasional kualitas data:
 
-1. **Batasan Protokol RFC**:
+1. 🌐 **Batasan Protokol RFC**:
    - Nilai flag pesan `qr` wajib bernilai 0 (Query) atau 1 (Response) sesuai RFC 1035.
    - Protokol transport `proto` wajib berada di dalam himpunan protokol DNS valid (`['udp', 'tcp']`).
    - Kode respons `rcode` berada pada rentang yang dialokasikan IANA (0 sampai 23).
    - Panjang frame `frame_len` dan panjang payload DNS `dns_len` wajib bernilai positif (> 0).
 
-2. **Kebijakan Kualitas Data Proyek**:
+2. 📋 **Kebijakan Kualitas Data Proyek**:
    - Nilai `qdcount` dibatasi pada rentang operasional wajar (0 sampai 20) untuk menyaring anomali paket malformed yang menyimpang dari pola query normal.
    - Pengecekan konsistensi waktu memastikan timestamp berada dalam rentang observasi yang valid.
 
 ---
 
-## Perlindungan Data dan Keamanan
+## 🔒 Perlindungan Data dan Keamanan
 
 Repositori ini menerapkan kebijakan ketat perlindungan kerahasiaan data (*zero-data leakage policy*):
 
-### Kebijakan Data Terbatas
+### 🛡️ Kebijakan Data Terbatas
 1. **Pencegahan Commit Data Asli**: Seluruh berkas dataset DNS mentah (`data/*.csv`, `data/*.parquet`), tangkapan paket (`*.pcap`, `*.pcapng`), basis data DuckDB lokal (`data/*.duckdb`), kredensial (`.env*`, `*.pem`, `*.key`), dan keluaran analitik (`output/*.json`) dicegah masuk ke Git melalui `.gitignore`.
 2. **Kemandirian Pengujian Sintetis**: Seluruh pengujian CI, pytest, dan dbt build dijalankan secara terisolasi menggunakan data sintetis deterministik yang digenerate oleh `scripts/generate_sample_data.py`.
 3. **Pembersihan Keluaran Notebook**: Berkas Jupyter notebook diperiksa untuk memastikan tidak memuat riwayat eksekusi cell yang berpotensi membocorkan data sensitif.
 
-### Git Hooks (Pre-Commit & Pre-Push)
+### 🪝 Git Hooks (Pre-Commit & Pre-Push)
 Untuk melindungi kode sebelum terkirim ke remote:
 - **`pre-commit`**: Memeriksa berkas yang berada dalam area *staged* sebelum perintah `git commit` diselesaikan.
 - **`pre-push`**: Mengaudit seluruh rentang commit (*commit range*) yang akan dikirim ke remote (`remote_ref..local_ref`), bukan hanya *working tree* terakhir. Hal ini mencegah pengiriman commit lama yang membawa berkas terlarang.
@@ -203,12 +203,12 @@ Untuk melindungi kode sebelum terkirim ke remote:
 > git config core.hooksPath .githooks
 > ```
 
-### Batasan Deteksi & Pencegahan Dini
+### ⚠️ Batasan Deteksi & Pencegahan Dini
 - **Batas Deteksi Scanner**: Pemindai rahasia lokal (`scripts/data_protection_check.py` dan `detect-secrets`) mendeteksi token berentropi tinggi dan pola kredensial terstruktur. Scanner **tidak dapat secara otomatis mengenali seluruh variasi alamat IP, prefiks jaringan, domain privat, atau data pribadi (PII)** tanpa pola format spesifik. Oleh karena itu, disiplin pengembang dan pembatasan via `.gitignore` merupakan garis pertahanan utama.
 - **Pencegahan Sebelum Push**: Jangan pernah mengandalkan event `push` pada CI GitHub Actions sebagai mekanisme proteksi utama, karena data sensitif yang terdorong telah sampai di server remote sebelum workflow CI dijalankan. Perlindungan wajib dilakukan secara lokal pada level pre-commit dan pre-push.
 - **Keamanan Log**: Pemindai tidak menampilkan nilai rahasia di konsol atau log; pemindai hanya menampilkan kategori temuan, nama berkas, dan nomor baris.
 
-## Struktur Repositori
+## 📂 Struktur Repositori
 
 ```
 .
@@ -264,14 +264,14 @@ Untuk melindungi kode sebelum terkirim ke remote:
 
 ---
 
-## Mulai Cepat
+## 🚀 Mulai Cepat
 
-### Prasyarat
+### 📋 Prasyarat
 - Python 3.10 atau versi lebih baru (teruji pada Python 3.14.4).
 - RAM minimal 4 GB saat menggunakan Parquet/DuckDB (atau minimal 16 GB untuk pemrosesan Pandas CSV penuh).
 - Ruang disk kosong minimal 3 GB.
 
-### 1. Pemasangan Lingkungan & Aktivasi Git Hooks
+### 1. ⚙️ Pemasangan Lingkungan & Aktivasi Git Hooks
 
 ```bash
 python3 -m venv .venv
@@ -282,7 +282,7 @@ pip install -r requirements.txt
 git config core.hooksPath .githooks
 ```
 
-### 2. Opsi Eksekusi Pipeline CLI
+### 2. 💻 Opsi Eksekusi Pipeline CLI
 
 Pipeline dapat dijalankan melalui modul paket (`python -m src`) maupun melalui wrapper root (`python main.py`):
 
@@ -303,7 +303,7 @@ python -m src --benchmark --sample 200000
 python -m src
 ```
 
-### 3. Pengujian Otomatis dan CI Lokal
+### 3. 🧪 Pengujian Otomatis dan CI Lokal
 
 ```bash
 # 1. Uji pemformatan dan linting kode
@@ -322,12 +322,12 @@ dbt build --project-dir dbt_dns --profiles-dir dbt_dns
 
 ---
 
-## Aturan Merge dan Perlindungan Branch
+## 🌿 Aturan Merge dan Perlindungan Branch
 
 > [!WARNING]
 > Konfigurasi alur kerja di `.github/workflows/ci.yml` mendefinisikan pekerjaan otomatisasi CI. Berkas workflow **tidak secara otomatis mengunci branch** di repositori GitHub. Administrator repositori wajib mengaktifkan kebijakan perlindungan branch (*Branch Protection Rules*) secara manual melalui GitHub Repository Settings.
 
-### Pengaturan GitHub yang Wajib Diterapkan
+### 🛡️ Pengaturan GitHub yang Wajib Diterapkan
 
 Untuk menjamin kualitas analitik dan mencegah kebocoran data tak sengaja, branch `main` harus dikonfigurasi melalui menu **Settings > Branches > Branch protection rules**:
 
@@ -352,7 +352,7 @@ Untuk menjamin kualitas analitik dan mencegah kebocoran data tak sengaja, branch
 
 ---
 
-## Modul dan Komponen
+## 🧩 Modul dan Komponen
 
 | Modul | Fungsi Utama | Masukan / Keluaran |
 |---|---|---|
@@ -365,27 +365,27 @@ Untuk menjamin kualitas analitik dan mencegah kebocoran data tak sengaja, branch
 
 ---
 
-## Temuan Operasional
+## 📈 Temuan Operasional
 
 Berdasarkan eksekusi pipeline pada 29 menit jendela kanonik (*steady-state*):
 
-1. **Beban dan Laju Pesan**:
+1. 📊 **Beban dan Laju Pesan**:
    - Total pesan yang diproses adalah **11.712.623 pesan** (5.861.701 query dan 5.850.922 respons).
    - Throughput rata-rata mencapai **6.507 pesan/detik**.
-2. **Konsentrasi Ekstrem Prefiks (Pareto)**:
+2. 🌐 **Konsentrasi Ekstrem Prefiks (Pareto)**:
    - Satu subnet tunggal (**Subnet S1**) menyerap **47,4%** dari total seluruh query yang masuk.
    - 10 subnet pengirim teratas menyumbang lebih dari 53% total volume query global.
-3. **Analisis Lonjakan NXDOMAIN**:
+3. ⚠️ **Analisis Lonjakan NXDOMAIN**:
    - Tingkat kegagalan NXDOMAIN global berada di angka **11,54%**.
    - Terjadi lonjakan tajam pada menit **08:02 UTC** mencapai **51.629 NXDOMAIN/menit** (laju kegagalan 22,46%), jauh di atas *baseline* 21.634 NXDOMAIN/menit.
    - Dekomposisi deterministik membuktikan bahwa **50,2%** dari selisih lonjakan bersih (+29.995 galat) disebabkan oleh aktivitas **dua host penerima saja (H1 dan H2)** yang meminta record `NS` dan `DS`.
-4. **Truncation Respons UDP**:
+4. ✂️ **Truncation Respons UDP**:
    - Rata-rata **5,78% respons UDP terpotong (TC=1)** akibat ukuran jawaban melebihi buffer EDNS0 1232 bytes.
    - Pemotongan terbesar terjadi pada record terkait DNSSEC: **CAA (38,4%)**, **DNSKEY (37,6%)**, dan **DS (37,5%)**.
 
 ---
 
-## Angka Kunci dan Sumber
+## 🔢 Angka Kunci dan Sumber
 
 Setiap angka di bawah ini bersumber langsung dari hasil komputasi kode:
 
@@ -406,7 +406,7 @@ Setiap angka di bawah ini bersumber langsung dari hasil komputasi kode:
 
 ---
 
-## Pemecahan Masalah
+## ❓ Pemecahan Masalah
 
 | Gejala | Penyebab Umum | Solusi Perbaikan |
 |---|---|---|
@@ -417,6 +417,6 @@ Setiap angka di bawah ini bersumber langsung dari hasil komputasi kode:
 
 ---
 
-## Lisensi
+## 📜 Lisensi
 
 Proyek ini dilisensikan di bawah ketentuan [MIT License](LICENSE).
