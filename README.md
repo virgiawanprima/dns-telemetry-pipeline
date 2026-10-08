@@ -1,6 +1,8 @@
-# 🚀 Pipeline Telemetri & Analisis Operasional DNS (11,7 Juta Pesan)
+<h1 align="center">🚀 Pipeline Telemetri & Analisis Operasional DNS (11,7 Juta Pesan)</h1>
 
-> Pipeline rekayasa data berkecepatan tinggi berbasis Modern Data Stack (DuckDB, Apache Parquet, dbt Core, Pandera) untuk pemrosesan log DNS skala besar, pemodelan analitik, dan penegakan kontrak kualitas data.
+<p align="center">
+  <em>Pipeline rekayasa data berkecepatan tinggi berbasis Modern Data Stack (DuckDB, Apache Parquet, dbt Core, Pandera) untuk pemrosesan log DNS skala besar, pemodelan analitik, dan penegakan kontrak kualitas data.</em>
+</p>
 
 ---
 
