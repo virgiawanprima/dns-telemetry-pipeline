@@ -1,8 +1,16 @@
-<h1 align="center">🚀 Pipeline Telemetri & Analisis Operasional DNS (11,7 Juta Pesan)</h1>
-
-<p align="center">
-  <em>Pipeline rekayasa data berkecepatan tinggi berbasis Modern Data Stack (DuckDB, Apache Parquet, dbt Core, Pandera) untuk pemrosesan log DNS skala besar, pemodelan analitik, dan penegakan kontrak kualitas data.</em>
-</p>
+<div align="center">
+  <h1>🚀 Pipeline Telemetri & Analisis Operasional DNS (11,7 Juta Pesan)</h1>
+  <p>
+    <em>Pipeline rekayasa data berkecepatan tinggi berbasis Modern Data Stack (DuckDB, Apache Parquet, dbt Core, Pandera) untuk pemrosesan log DNS skala besar, pemodelan analitik, dan penegakan kontrak kualitas data.</em>
+  </p>
+  <p>
+    <a href="https://github.com/virgiawanprima/dns-telemetry-pipeline/actions/workflows/ci.yml"><img src="https://github.com/virgiawanprima/dns-telemetry-pipeline/actions/workflows/ci.yml/badge.svg" alt="CI Pipeline" /></a>
+    <img src="https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12-3776AB?logo=python&logoColor=white" alt="Python" />
+    <img src="https://img.shields.io/badge/DuckDB-1.5.6-FFF000?logo=duckdb&logoColor=black" alt="DuckDB" />
+    <img src="https://img.shields.io/badge/dbt--duckdb-1.11.0-FF694B?logo=dbt&logoColor=white" alt="dbt" />
+    <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT" /></a>
+  </p>
+</div>
 
 ---
 
@@ -167,6 +175,23 @@ Transformasi data dimodelkan secara modular di dalam direktori `dbt_dns/`:
 - 🚀 **Transformasi (`dbt run`)**: 4 model selesai dalam **4,13 detik**.
 - 🧪 **Pengujian Kualitas Data (`dbt test`)**: 16 pengujian data (12 uji skema generik *not-null*, *unique*, *accepted values* serta 4 uji singular rekonsiliasi analitik) lulus 100% dalam **0,62 detik**.
 
+<details>
+  <summary>🔍 <b>Lihat rincian 16 pengujian data dbt (schema & singular tests)</b></summary>
+  <br/>
+
+| Kategori Pengujian | Model Target | Jenis Assertion | Status |
+|---|---|---|---|
+| Schema Generic | `stg_dns_packets` | `not_null`, `unique`, `accepted_values` | PASS |
+| Schema Generic | `fct_temporal_metrics` | `not_null`, `unique` | PASS |
+| Schema Generic | `fct_pareto_prefix` | `not_null`, `unique` | PASS |
+| Schema Generic | `fct_protocol_matrix` | `not_null`, `unique` | PASS |
+| Singular Analytics | `fct_temporal_metrics` | `assert_temporal_metrics_valid` | PASS |
+| Singular Analytics | `fct_pareto_prefix` | `assert_pareto_prefix_valid` | PASS |
+| Singular Analytics | `fct_protocol_matrix` | `assert_protocol_matrix_valid` | PASS |
+| Singular Non-Empty | Semua Marts | `assert_marts_not_empty` | PASS |
+
+</details>
+
 ---
 
 ## 🛡️ Kontrak Kualitas Data
@@ -304,6 +329,31 @@ python -m src --benchmark --sample 200000
 # 5. Jalankan kalkulasi analitik penuh dan ekspor ringkasan metrik
 python -m src
 ```
+
+<details>
+  <summary>📄 <b>Lihat cuplikan luaran terstruktur <code>output/metrics_summary.json</code></b></summary>
+  <br/>
+
+```json
+{
+  "meta": {
+    "judul": "Analisis Operasional & Telemetri DNS Skala Besar",
+    "zona_waktu": "UTC",
+    "n_pesan": 11712623,
+    "n_query": 5861701,
+    "n_respons": 5850922
+  },
+  "kpi": [
+    { "judul": "Pesan DNS", "nilai": "11,712,623", "cakupan": "rekaman penuh" },
+    { "judul": "Pesan / detik", "nilai": "6,507", "cakupan": "rekaman penuh" },
+    { "judul": "NXDOMAIN", "nilai": "11.54%", "cakupan": "rekaman penuh" },
+    { "judul": "Truncation UDP", "nilai": "5.78%", "cakupan": "29 menit kanonik" },
+    { "judul": "Pangsa S1", "nilai": "47.4%", "cakupan": "29 menit kanonik" }
+  ]
+}
+```
+
+</details>
 
 ### 3. 🧪 Pengujian Otomatis dan CI Lokal
 
